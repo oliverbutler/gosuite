@@ -91,3 +91,20 @@ func GetTableSchema(db *sql.DB, table string) (ExecuteResult, error) {
 
 	return res, err
 }
+
+func GetTables(db *sql.DB) ([]string, error) {
+	tables := make([]string, 0)
+
+	res, err := ExecuteSQL(db, "SHOW TABLES")
+	if err != nil {
+		return tables, err
+	}
+
+	for _, row := range res.Rows {
+		for _, col := range res.Columns {
+			tables = append(tables, row[col].(string))
+		}
+	}
+
+	return tables, nil
+}

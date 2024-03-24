@@ -18,10 +18,13 @@ var baseStyle = lipgloss.NewStyle().
 	BorderForeground(lipgloss.Color("240"))
 
 type model struct {
-	db          *sql.DB
-	err         error
-	textarea    textarea.Model
-	resultTable table.Model
+	db             *sql.DB
+	err            error
+	textarea       textarea.Model
+	tables         []string
+	resultTable    table.Model
+	terminalWidth  int
+	terminalHeight int
 }
 
 type errMsg error
@@ -33,10 +36,16 @@ func initialModel() model {
 
 	conn := db.Connect()
 
+	tables, err := db.GetTables(conn)
+	if err != nil {
+		panic(err)
+	}
+
 	return model{
 		db:       conn,
 		textarea: txt,
 		err:      nil,
+		tables:   tables,
 	}
 }
 
@@ -63,6 +72,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.terminalWidth = msg.Width
+		m.terminalHeight = msg.Height
 	case executeSqlMsg:
 
 		columns := make([]table.Column, 0)
@@ -105,6 +117,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Bold(false)
 		t.SetStyles(s)
 
+		t.Focus()
+
 		m.resultTable = t
 
 	case tea.KeyMsg:
@@ -145,12 +159,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return fmt.Sprintf(
-		"%s\n%s\n\n%s",
-		m.textarea.View(),
-		baseStyle.Render(m.resultTable.View()),
-		"(ctrl+c to quit)",
-	) + "\n\n"
+	// Define styles
+	navStyle := lipgloss.NewStyle().
+		Padding(0, 1).
+		Border(lipgloss.RoundedBorder()).
+		Width(m.terminalWidth - 1).
+		MarginBottom(1)
+	sideBarStyle := lipgloss.NewStyle().
+		Width(30).
+		Height(10).
+		Border(lipgloss.RoundedBorder()).
+		MarginRight(1)
+	resultStyle := lipgloss.NewStyle().Height(10).Border(lipgloss.RoundedBorder())
+
+	nav := navStyle.Render(m.textarea.View())
+
+	tablesString := ""
+
+	for _, table := range m.tables {
+		tablesString += table + "\n"
+	}
+
+	sidebar := sideBarStyle.Render(tablesString)
+
+	result := resultStyle.Render(m.resultTable.View())
+
+	bottomRow := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, result)
+	layout := lipgloss.JoinVertical(lipgloss.Left, nav, bottomRow)
+
+	return layout
 }
 
 func main() {

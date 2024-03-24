@@ -2,11 +2,13 @@ package db
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 )
 
 func TestExecute(t *testing.T) {
 	db := Connect()
+	defer db.Close()
 
 	res, err := ExecuteSQL(db, "SELECT * FROM posts")
 	if err != nil {
@@ -18,6 +20,20 @@ func TestExecute(t *testing.T) {
 	}
 
 	fmt.Println(res)
+}
 
-	db.Close()
+func TestGetTable(t *testing.T) {
+	db := Connect()
+	defer db.Close()
+
+	res, err := GetTables(db)
+	if err != nil {
+		panic(err)
+	}
+
+	expected := []string{"authors", "comments", "posts"}
+
+	if !reflect.DeepEqual(res, expected) {
+		t.Errorf("Expected %v, got %v", expected, res)
+	}
 }
