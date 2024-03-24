@@ -17,6 +17,14 @@ var baseStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.NormalBorder()).
 	BorderForeground(lipgloss.Color("240"))
 
+// Enum for the selected tab
+const (
+	DatabaseTab = iota
+	TablesTab
+	QueryTab
+	ResultTab
+)
+
 type model struct {
 	db             *sql.DB
 	err            error
@@ -25,6 +33,7 @@ type model struct {
 	resultTable    table.Model
 	terminalWidth  int
 	terminalHeight int
+	selectedTab    int
 }
 
 type errMsg error
@@ -42,10 +51,11 @@ func initialModel() model {
 	}
 
 	return model{
-		db:       conn,
-		textarea: txt,
-		err:      nil,
-		tables:   tables,
+		db:          conn,
+		textarea:    txt,
+		err:         nil,
+		tables:      tables,
+		selectedTab: DatabaseTab,
 	}
 }
 
@@ -159,33 +169,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	// Define styles
-	navStyle := lipgloss.NewStyle().
-		Padding(0, 1).
-		Border(lipgloss.RoundedBorder()).
-		Width(m.terminalWidth - 1).
-		MarginBottom(1)
-	sideBarStyle := lipgloss.NewStyle().
-		Width(30).
-		Height(10).
+	// Tab is a bordered box, with a name near the top left with a number e.g. 1. Database or 2. Tables
+	tabStyles := lipgloss.NewStyle().
+		Padding(1, 1).
 		Border(lipgloss.RoundedBorder()).
 		MarginRight(1)
-	resultStyle := lipgloss.NewStyle().Height(10).Border(lipgloss.RoundedBorder())
 
-	nav := navStyle.Render(m.textarea.View())
+	safeWidth := m.terminalWidth - 5
+	safeHeight := m.terminalHeight - 5
 
-	tablesString := ""
+	leftColWidth := 40
+	rightColWidth := safeWidth - leftColWidth
 
-	for _, table := range m.tables {
-		tablesString += table + "\n"
-	}
+	databaseHeight := 5
+	tablesHeight := safeHeight - databaseHeight
 
-	sidebar := sideBarStyle.Render(tablesString)
+	queryHeight := 10
+	resultHeight := safeHeight - queryHeight
 
-	result := resultStyle.Render(m.resultTable.View())
+	databaseTab := tabStyles.Width(leftColWidth).Height(databaseHeight).Render("1. Database")
+	tablesTab := tabStyles.Width(leftColWidth).Height(tablesHeight).Render("2. Tables")
+	queryTab := tabStyles.Width(rightColWidth).Height(queryHeight).Render("3. Query")
+	resultTab := tabStyles.Width(rightColWidth).Height(resultHeight).Render("4. Result")
 
-	bottomRow := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, result)
-	layout := lipgloss.JoinVertical(lipgloss.Left, nav, bottomRow)
+	leftCol := lipgloss.JoinVertical(lipgloss.Left, databaseTab, tablesTab)
+	rightCol := lipgloss.JoinVertical(lipgloss.Left, queryTab, resultTab)
+
+	layout := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol)
 
 	return layout
 }
