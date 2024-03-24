@@ -70,15 +70,32 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.terminalHeight = msg.Height
 
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyTab:
+		switch msg.String() {
+		case "shift+tab":
+			m.selectedTab--
+
+			if m.selectedTab < DatabaseTab {
+				m.selectedTab = ResultTab
+			}
+
+		case "tab":
+
 			m.selectedTab++
 
 			if m.selectedTab > ResultTab {
 				m.selectedTab = DatabaseTab
 			}
 
-		case tea.KeyCtrlC:
+		case "1":
+			m.selectedTab = DatabaseTab
+		case "2":
+			m.selectedTab = TablesTab
+		case "3":
+			m.selectedTab = QueryTab
+		case "4":
+			m.selectedTab = ResultTab
+
+		case "ctrl+c":
 			return m, tea.Quit
 		}
 	}
@@ -118,7 +135,12 @@ func (m MainModel) View() string {
 		m.selectedTab == DatabaseTab,
 		leftColWidth,
 		databaseHeight,
-		"127.0.0.1:3306",
+		lipgloss.JoinHorizontal(lipgloss.Left,
+			lipgloss.NewStyle().Render("127.0.0.1:3306  "), lipgloss.NewStyle().
+				Background(lipgloss.Color("120")).
+				Foreground(lipgloss.Color("0")).
+				Padding(0, 2).
+				Render("Connected")),
 	)
 
 	tablesTab := m.tablesModel.View(m.selectedTab == TablesTab, leftColWidth, tablesHeight)
