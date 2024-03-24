@@ -31,22 +31,28 @@ func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg, active bool, conn *sql.DB) (Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyUp:
-			if m.SelectedTableIndex > 0 {
+			if m.SelectedTableIndex > 0 && active {
 				m.SelectedTableIndex--
 			}
 		case tea.KeyDown:
-			if m.SelectedTableIndex < len(m.Tables)-1 {
+			if m.SelectedTableIndex < len(m.Tables)-1 && active {
 				m.SelectedTableIndex++
 			}
+		case tea.KeyEnter:
+			cmd = db.ExucuteSQLCmd("SELECT * FROM "+m.Tables[m.SelectedTableIndex], conn)
+			cmds = append(cmds, cmd)
 		}
 	}
 
-	return m, nil
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) View(selected bool, width int, height int) string {

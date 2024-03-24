@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/charmbracelet/bubbles/table"
 	textarea "github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	db "gosuite/db"
 	design "gosuite/design"
+	result "gosuite/result"
 	tables "gosuite/tables"
 )
 
@@ -27,16 +27,11 @@ type MainModel struct {
 	db             *sql.DB
 	err            error
 	queryInput     string
-	latestResult   dbResultModel
 	terminalWidth  int
 	terminalHeight int
 	selectedTab    int
 	tablesModel    tables.Model
-}
-
-type dbResultModel struct {
-	table        table.Model
-	microSeconds int64
+	resultModel    result.Model
 }
 
 type errMsg error
@@ -82,24 +77,17 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if m.selectedTab == TablesTab {
-		m.tablesModel, cmd = m.tablesModel.Update(msg)
-		cmds = append(cmds, cmd)
-	}
+	m.tablesModel, cmd = m.tablesModel.Update(msg, m.selectedTab == TablesTab, m.db)
+	cmds = append(cmds, cmd)
+
+	m.resultModel, cmd = m.resultModel.Update(msg, m.selectedTab == ResultTab)
+	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
 }
 
 func (m MainModel) QueryView() string {
 	return m.queryInput
-}
-
-func (m MainModel) ResultView() string {
-	return lipgloss.JoinVertical(
-		lipgloss.Top,
-		m.latestResult.table.View(),
-		fmt.Sprintf("Executed in %d microseconds", m.latestResult.microSeconds),
-	)
 }
 
 func (m MainModel) View() string {
@@ -135,14 +123,7 @@ func (m MainModel) View() string {
 		m.QueryView(),
 	)
 
-	resultTab := design.CreatePane(
-		4,
-		"Result",
-		m.selectedTab == ResultTab,
-		rightColWidth,
-		resultHeight,
-		m.ResultView(),
-	)
+	resultTab := m.resultModel.View(m.selectedTab == ResultTab, rightColWidth, resultHeight)
 
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, databaseTab, tablesTab)
 	rightCol := lipgloss.JoinVertical(lipgloss.Left, queryTab, resultTab)
