@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -169,26 +170,44 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func addTextToBorder(content string, index string, text string, selected bool) string {
+// stripANSI removes ANSI escape sequences from a string.
+func stripANSI(str string) string {
+	re := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	return re.ReplaceAllString(str, "")
+}
+
+// 'selected' determines whether the text is bolded.
+func addTextToBorder(content, index, text string, selected bool) string {
 	lines := strings.Split(content, "\n")
-
-	insertionText := lipgloss.NewStyle().Bold(selected).Render("[" + index + "] " + text)
-
-	insertAt := 3
-
-	runes := []rune(lines[0])
-
-	beforeInsertion := string(runes[:insertAt])
-
-	// TODO: Not sure why 8 is the magic number here
-	cutIndex := insertAt + len([]rune(insertionText)) - 8
-
-	if cutIndex > len(runes) {
-		cutIndex = len(runes)
+	if len(lines) < 1 {
+		return content // If there's no content, just return it unchanged.
 	}
 
+	// Render the insertion text with optional bold styling.
+	insertionText := lipgloss.NewStyle().
+		Bold(selected).
+		Foreground(getBorderColor(selected)).
+		Render("[" + index + "] " + text)
+	// Calculate the visible length of the insertionText by stripping ANSI codes.
+	visibleInsertionLength := len(stripANSI(insertionText))
+
+	// Calculate insertion points based on the actual visible content length.
+	insertAt := 3 // Assumes a fixed starting position for the insertion.
+
+	// Convert the first line to runes to handle potential Unicode characters correctly.
+	runes := []rune(lines[0])
+
+	// Calculate the cut index based on visible content, adjusting for the border's visual length.
+	cutIndex := insertAt + visibleInsertionLength
+	if cutIndex > len(runes) {
+		cutIndex = len(runes) // Ensure cutIndex does not exceed the line length.
+	}
+
+	// Reassemble the modified top border.
+	beforeInsertion := string(runes[:insertAt])
 	afterInsertion := string(runes[cutIndex:])
 
+	// Construct the new first line with the inserted text.
 	lines[0] = beforeInsertion + insertionText + afterInsertion
 
 	return strings.Join(lines, "\n")
@@ -214,6 +233,13 @@ func (m model) ResultView() string {
 	return m.resultTable.View()
 }
 
+func getBorderColor(selected bool) lipgloss.TerminalColor {
+	if selected {
+		return lipgloss.Color("50")
+	}
+	return lipgloss.Color("255")
+}
+
 func (m model) View() string {
 	// Tab is a bordered box, with a name near the top left with a number e.g. 1. Database or 2. Tables
 	tabStyles := lipgloss.NewStyle().
@@ -234,25 +260,37 @@ func (m model) View() string {
 	resultHeight := safeHeight - queryHeight
 
 	databaseTab := addTextToBorder(
-		tabStyles.Width(leftColWidth).Height(databaseHeight).Render("127.0.0.1:3306 (LOCAL)"),
+		tabStyles.BorderForeground(getBorderColor(m.selectedTab == DatabaseTab)).
+			Width(leftColWidth).
+			Height(databaseHeight).
+			Render("127.0.0.1:3306 (LOCAL)"),
 		"1",
 		"Database",
 		m.selectedTab == DatabaseTab,
 	)
 	tablesTab := addTextToBorder(
-		tabStyles.Width(leftColWidth).Height(tablesHeight).Render(m.TablesView()),
+		tabStyles.
+			BorderForeground(
+				getBorderColor(m.selectedTab == TablesTab),
+			).Width(leftColWidth).Height(tablesHeight).Render(m.TablesView()),
 		"2",
 		"Tables",
 		m.selectedTab == TablesTab,
 	)
 	queryTab := addTextToBorder(
-		tabStyles.Width(rightColWidth).Height(queryHeight).Render(m.QueryView()),
+		tabStyles.
+			BorderForeground(
+				getBorderColor(m.selectedTab == QueryTab),
+			).Width(rightColWidth).Height(queryHeight).Render(m.QueryView()),
 		"3",
 		"Query",
 		m.selectedTab == QueryTab,
 	)
 	resultTab := addTextToBorder(
-		tabStyles.Width(rightColWidth).Height(resultHeight).Render(m.ResultView()),
+		tabStyles.BorderForeground(getBorderColor(m.selectedTab == ResultTab)).
+			Width(rightColWidth).
+			Height(resultHeight).
+			Render(m.ResultView()),
 		"4",
 		"Result",
 		m.selectedTab == ResultTab,
