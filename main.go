@@ -15,10 +15,6 @@ import (
 	tables "gosuite/tables"
 )
 
-var baseStyle = lipgloss.NewStyle().
-	BorderStyle(lipgloss.NormalBorder()).
-	BorderForeground(lipgloss.Color("240"))
-
 // Enum for the selected tab
 const (
 	DatabaseTab = iota
@@ -104,13 +100,6 @@ func (m MainModel) ResultView() string {
 		m.latestResult.table.View(),
 		fmt.Sprintf("Executed in %d microseconds", m.latestResult.microSeconds),
 	)
-}
-
-func getBorderColor(selected bool) lipgloss.TerminalColor {
-	if selected {
-		return lipgloss.Color("50")
-	}
-	return lipgloss.Color("255")
 }
 
 func (m MainModel) View() string {
