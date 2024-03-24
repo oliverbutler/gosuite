@@ -43,6 +43,7 @@ func ExucuteSQLCmd(sql string, conn *sql.DB) tea.Cmd {
 }
 
 type ExecuteResult struct {
+	Query        string
 	Rows         []map[string]interface{}
 	Columns      []string
 	Microseconds int64
@@ -102,7 +103,12 @@ func ExecuteSQL(db *sql.DB, sql string) (ExecuteResult, error) {
 		return ExecuteResult{}, err
 	}
 
-	return ExecuteResult{Rows: results, Columns: columns, Microseconds: elapsed.Microseconds()}, nil
+	return ExecuteResult{
+		Query:        sql,
+		Rows:         results,
+		Columns:      columns,
+		Microseconds: elapsed.Microseconds(),
+	}, nil
 }
 
 func GetTableSchema(db *sql.DB, table string) (ExecuteResult, error) {

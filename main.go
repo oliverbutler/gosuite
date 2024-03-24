@@ -11,6 +11,7 @@ import (
 
 	db "gosuite/db"
 	design "gosuite/design"
+	query "gosuite/query"
 	result "gosuite/result"
 	tables "gosuite/tables"
 )
@@ -32,6 +33,7 @@ type MainModel struct {
 	selectedTab    int
 	tablesModel    tables.Model
 	resultModel    result.Model
+	queryModel     query.Model
 }
 
 type errMsg error
@@ -40,6 +42,8 @@ func initialModel() MainModel {
 	conn := db.Connect()
 
 	tablesModel := tables.InitModel(conn)
+	resultModel := result.InitModel()
+	queryModel := query.InitModel()
 
 	return MainModel{
 		db:          conn,
@@ -47,6 +51,8 @@ func initialModel() MainModel {
 		err:         nil,
 		selectedTab: DatabaseTab,
 		tablesModel: tablesModel,
+		resultModel: resultModel,
+		queryModel:  queryModel,
 	}
 }
 
@@ -83,6 +89,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.resultModel, cmd = m.resultModel.Update(msg, m.selectedTab == ResultTab)
 	cmds = append(cmds, cmd)
 
+	m.queryModel, cmd = m.queryModel.Update(msg, m.selectedTab == QueryTab, m.db)
+	cmds = append(cmds, cmd)
+
 	return m, tea.Batch(cmds...)
 }
 
@@ -113,16 +122,7 @@ func (m MainModel) View() string {
 	)
 
 	tablesTab := m.tablesModel.View(m.selectedTab == TablesTab, leftColWidth, tablesHeight)
-
-	queryTab := design.CreatePane(
-		3,
-		"Query",
-		m.selectedTab == QueryTab,
-		rightColWidth,
-		queryHeight,
-		m.QueryView(),
-	)
-
+	queryTab := m.queryModel.View(m.selectedTab == QueryTab, rightColWidth, queryHeight)
 	resultTab := m.resultModel.View(m.selectedTab == ResultTab, rightColWidth, resultHeight)
 
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, databaseTab, tablesTab)

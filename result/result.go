@@ -87,5 +87,5 @@ func (m Model) View(selected bool, width int, height int) string {
 		)
 	}
 
-	return design.CreatePane(2, "Tables", selected, width, height, content)
+	return design.CreatePane(4, "Results", selected, width, height, content)
 }
