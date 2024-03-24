@@ -25,26 +25,25 @@ func Connect() *sql.DB {
 		panic(err.Error())
 	}
 
-	fmt.Println("Connected!")
-
 	return db
 }
 
-type executeResult struct {
-	rows []map[string]interface{}
+type ExecuteResult struct {
+	Rows    []map[string]interface{}
+	Columns []string
 }
 
-func ExecuteSQL(db *sql.DB, sql string) (executeResult, error) {
+func ExecuteSQL(db *sql.DB, sql string) (ExecuteResult, error) {
 	rows, err := db.Query(sql)
 	if err != nil {
-		return executeResult{}, err
+		return ExecuteResult{}, err
 	}
 
 	defer rows.Close()
 
 	columns, err := rows.Columns()
 	if err != nil {
-		return executeResult{}, err
+		return ExecuteResult{}, err
 	}
 
 	var results []map[string]interface{}
@@ -60,21 +59,35 @@ func ExecuteSQL(db *sql.DB, sql string) (executeResult, error) {
 
 		// Scan the data into the column pointers...
 		if err := rows.Scan(columnPointers...); err != nil {
-			return executeResult{}, err
+			return ExecuteResult{}, err
 		}
 
 		// Create our map, and populate it with our data.
 		rowData := make(map[string]interface{})
 		for i, colName := range columns {
 			val := columnPointers[i].(*interface{})
-			rowData[colName] = *val
+
+			// if int array make a string
+			if *val == nil {
+				rowData[colName] = nil
+			} else if _, ok := (*val).([]byte); ok {
+				rowData[colName] = string((*val).([]byte))
+			} else {
+				rowData[colName] = *val
+			}
 		}
 
 		results = append(results, rowData)
 	}
 	if err := rows.Err(); err != nil {
-		return executeResult{}, err
+		return ExecuteResult{}, err
 	}
 
-	return executeResult{rows: results}, nil
+	return ExecuteResult{Rows: results, Columns: columns}, nil
+}
+
+func GetTableSchema(db *sql.DB, table string) (ExecuteResult, error) {
+	res, err := ExecuteSQL(db, fmt.Sprintf("DESCRIBE %s", table))
+
+	return res, err
 }

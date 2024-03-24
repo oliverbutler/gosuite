@@ -5,17 +5,23 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/charmbracelet/bubbles/table"
 	textarea "github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	db "gosuite/db"
 )
 
+var baseStyle = lipgloss.NewStyle().
+	BorderStyle(lipgloss.NormalBorder()).
+	BorderForeground(lipgloss.Color("240"))
+
 type model struct {
-	db       *sql.DB
-	err      error
-	textarea textarea.Model
-	result   string
+	db          *sql.DB
+	err         error
+	textarea    textarea.Model
+	resultTable table.Model
 }
 
 type errMsg error
@@ -25,13 +31,12 @@ func initialModel() model {
 	txt.Placeholder = "Write your SQL here..."
 	txt.Focus()
 
-	db := db.Connect()
+	conn := db.Connect()
 
 	return model{
-		db:       db,
+		db:       conn,
 		textarea: txt,
 		err:      nil,
-		result:   "",
 	}
 }
 
@@ -45,15 +50,12 @@ func exucuteSQL(sql string, conn *sql.DB) tea.Cmd {
 		if err != nil {
 			return errMsg(err)
 		}
-
-		fmt.Println(result)
-
-		return executeSqlMsg{sql: "soe string"}
+		return executeSqlMsg{result: result}
 	}
 }
 
 type executeSqlMsg struct {
-	sql string
+	result db.ExecuteResult
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -62,7 +64,49 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case executeSqlMsg:
-		m.result = msg.sql
+
+		columns := make([]table.Column, 0)
+
+		for _, col := range msg.result.Columns {
+			columns = append(columns, table.Column{
+				Title: col,
+				Width: 10,
+			})
+		}
+
+		rows := make([]table.Row, 0)
+
+		for _, row := range msg.result.Rows {
+			r := make([]string, 0)
+
+			for _, col := range msg.result.Columns {
+				r = append(r, fmt.Sprintf("%v", row[col]))
+			}
+
+			rows = append(rows, table.Row(r))
+		}
+
+		t := table.New(
+			table.WithColumns(columns),
+			table.WithRows(rows),
+			table.WithFocused(true),
+			table.WithHeight(10),
+		)
+
+		s := table.DefaultStyles()
+		s.Header = s.Header.
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("240")).
+			BorderBottom(true).
+			Bold(false)
+		s.Selected = s.Selected.
+			Foreground(lipgloss.Color("229")).
+			Background(lipgloss.Color("57")).
+			Bold(false)
+		t.SetStyles(s)
+
+		m.resultTable = t
+
 	case tea.KeyMsg:
 		switch msg.Type {
 
@@ -104,7 +148,7 @@ func (m model) View() string {
 	return fmt.Sprintf(
 		"%s\n%s\n\n%s",
 		m.textarea.View(),
-		m.result,
+		baseStyle.Render(m.resultTable.View()),
 		"(ctrl+c to quit)",
 	) + "\n\n"
 }
