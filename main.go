@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"regexp"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 	textarea "github.com/charmbracelet/bubbles/textarea"
@@ -13,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	db "gosuite/db"
+	design "gosuite/design"
 )
 
 var baseStyle = lipgloss.NewStyle().
@@ -28,14 +27,15 @@ const (
 )
 
 type model struct {
-	db             *sql.DB
-	err            error
-	textarea       textarea.Model
-	tables         []string
-	resultTable    table.Model
-	terminalWidth  int
-	terminalHeight int
-	selectedTab    int
+	db                 *sql.DB
+	err                error
+	textarea           textarea.Model
+	tables             []string
+	resultTable        table.Model
+	terminalWidth      int
+	terminalHeight     int
+	selectedTab        int
+	selectedTableIndex int
 }
 
 type errMsg error
@@ -53,11 +53,12 @@ func initialModel() model {
 	}
 
 	return model{
-		db:          conn,
-		textarea:    txt,
-		err:         nil,
-		tables:      tables,
-		selectedTab: DatabaseTab,
+		db:                 conn,
+		textarea:           txt,
+		err:                nil,
+		tables:             tables,
+		selectedTab:        DatabaseTab,
+		selectedTableIndex: 0,
 	}
 }
 
@@ -82,6 +83,25 @@ type executeSqlMsg struct {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
+
+	if m.selectedTab == TablesTab {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.Type {
+			case tea.KeyDown:
+				m.selectedTableIndex++
+				if m.selectedTableIndex > len(m.tables) {
+					m.selectedTableIndex = 0
+				}
+
+			case tea.KeyUp:
+				m.selectedTableIndex--
+				if m.selectedTableIndex < 0 {
+					m.selectedTableIndex = len(m.tables) - 1
+				}
+			}
+		}
+	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -176,63 +196,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// stripANSI removes ANSI escape sequences from a string.
-func stripANSI(str string) string {
-	re := regexp.MustCompile(`\x1b\[[0-9;]*m`)
-	return re.ReplaceAllString(str, "")
-}
-
-func addTextToBorder(content, index, text string, selected bool) string {
-	lines := strings.Split(content, "\n")
-	if len(lines) < 1 {
-		return content // If there's no content, just return it unchanged.
-	}
-
-	// Render the insertion text with optional bold styling.
-	insertionText := lipgloss.NewStyle().
-		Bold(selected).
-		Foreground(getBorderColor(selected)).
-		Render("[" + index + "] " + text)
-	// Calculate the visible length of the insertionText by stripping ANSI codes.
-	visibleInsertionLength := len(stripANSI(insertionText))
-
-	magicNumber := 6
-
-	// Process the first line to find the third visible character position.
-	strippedFirstLine := stripANSI(lines[0])
-	// Ensuring not to exceed the length of the stripped line.
-	if len(strippedFirstLine) < magicNumber {
-		return content // Not enough length for insertion.
-	}
-
-	// The third visible character position in the stripped content.
-	// Adjust 'insertAt' dynamically based on your requirements.
-	insertAt := magicNumber + len([]rune(strippedFirstLine)[:magicNumber])
-
-	// Convert the original first line (with ANSI codes) to runes.
-	runes := []rune(lines[0])
-	// Calculate the cut index; adjust dynamically if necessary.
-	cutIndex := insertAt + visibleInsertionLength
-	if cutIndex > len(runes) {
-		cutIndex = len(runes) // Ensure cutIndex does not exceed the line length.
-	}
-
-	beforeInsertion := string(runes[:insertAt])
-	afterInsertion := string(runes[cutIndex:])
-
-	// Reassemble the modified top border.
-	lines[0] = beforeInsertion + insertionText + afterInsertion
-
-	return strings.Join(lines, "\n")
-}
-
 func (m model) TablesView() string {
 	tableStyles := lipgloss.NewStyle()
 
 	tables := make([]string, 0)
 
-	for _, table := range m.tables {
-		tables = append(tables, tableStyles.Render(table))
+	for idx, table := range m.tables {
+		tables = append(
+			tables,
+			tableStyles.Foreground(getBorderColor(m.selectedTableIndex == idx)).Render(table),
+		)
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, tables...)
@@ -254,12 +227,6 @@ func getBorderColor(selected bool) lipgloss.TerminalColor {
 }
 
 func (m model) View() string {
-	// Tab is a bordered box, with a name near the top left with a number e.g. 1. Database or 2. Tables
-	tabStyles := lipgloss.NewStyle().
-		Padding(1, 1).
-		Border(lipgloss.RoundedBorder()).
-		MarginRight(1)
-
 	safeWidth := m.terminalWidth - 5
 	safeHeight := m.terminalHeight - 5
 
@@ -272,41 +239,40 @@ func (m model) View() string {
 	queryHeight := 10
 	resultHeight := safeHeight - queryHeight
 
-	databaseTab := addTextToBorder(
-		tabStyles.BorderForeground(getBorderColor(m.selectedTab == DatabaseTab)).
-			Width(leftColWidth).
-			Height(databaseHeight).
-			Render("127.0.0.1:3306 (LOCAL)"),
-		"1",
+	databaseTab := design.CreatePane(
+		1,
 		"Database",
 		m.selectedTab == DatabaseTab,
+		leftColWidth,
+		databaseHeight,
+		"127.0.0.1:3306",
 	)
-	tablesTab := addTextToBorder(
-		tabStyles.
-			BorderForeground(
-				getBorderColor(m.selectedTab == TablesTab),
-			).Width(leftColWidth).Height(tablesHeight).Render(m.TablesView()),
-		"2",
+
+	tablesTab := design.CreatePane(
+		2,
 		"Tables",
 		m.selectedTab == TablesTab,
+		leftColWidth,
+		tablesHeight,
+		m.TablesView(),
 	)
-	queryTab := addTextToBorder(
-		tabStyles.
-			BorderForeground(
-				getBorderColor(m.selectedTab == QueryTab),
-			).Width(rightColWidth).Height(queryHeight).Render(m.QueryView()),
-		"3",
+
+	queryTab := design.CreatePane(
+		3,
 		"Query",
 		m.selectedTab == QueryTab,
+		rightColWidth,
+		queryHeight,
+		m.QueryView(),
 	)
-	resultTab := addTextToBorder(
-		tabStyles.BorderForeground(getBorderColor(m.selectedTab == ResultTab)).
-			Width(rightColWidth).
-			Height(resultHeight).
-			Render(m.ResultView()),
-		"4",
+
+	resultTab := design.CreatePane(
+		4,
 		"Result",
 		m.selectedTab == ResultTab,
+		rightColWidth,
+		resultHeight,
+		m.ResultView(),
 	)
 
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, databaseTab, tablesTab)
