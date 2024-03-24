@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func getBorderColor(selected bool) lipgloss.TerminalColor {
+func GetBorderColor(selected bool) lipgloss.TerminalColor {
 	if selected {
 		return lipgloss.Color("50")
 	}
@@ -30,7 +30,7 @@ func addTextToBorder(content string, index int, text string, selected bool) stri
 	// Render the insertion text with optional bold styling.
 	insertionText := lipgloss.NewStyle().
 		Bold(selected).
-		Foreground(getBorderColor(selected)).
+		Foreground(GetBorderColor(selected)).
 		Render("[" + strconv.Itoa(index) + "] " + text)
 
 	// Calculate the visible length of the insertionText by stripping ANSI codes.
@@ -79,7 +79,7 @@ func CreatePane(
 		Border(lipgloss.RoundedBorder()).
 		MarginRight(1).
 		Width(width).
-		Height(height).BorderForeground(getBorderColor(selected)).Render(content)
+		Height(height).BorderForeground(GetBorderColor(selected)).Render(content)
 
 	return addTextToBorder(styledContent, index, title, selected)
 }

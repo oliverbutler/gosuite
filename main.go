@@ -12,6 +12,7 @@ import (
 
 	db "gosuite/db"
 	design "gosuite/design"
+	tables "gosuite/tables"
 )
 
 var baseStyle = lipgloss.NewStyle().
@@ -26,197 +27,83 @@ const (
 	ResultTab
 )
 
-type model struct {
-	db                 *sql.DB
-	err                error
-	textarea           textarea.Model
-	tables             []string
-	resultTable        table.Model
-	terminalWidth      int
-	terminalHeight     int
-	selectedTab        int
-	selectedTableIndex int
+type MainModel struct {
+	db             *sql.DB
+	err            error
+	queryInput     string
+	latestResult   dbResultModel
+	terminalWidth  int
+	terminalHeight int
+	selectedTab    int
+	tablesModel    tables.Model
+}
+
+type dbResultModel struct {
+	table        table.Model
+	microSeconds int64
 }
 
 type errMsg error
 
-func initialModel() model {
-	txt := textarea.New()
-	txt.Placeholder = "Write your SQL here..."
-	txt.Focus()
-
+func initialModel() MainModel {
 	conn := db.Connect()
 
-	tables, err := db.GetTables(conn)
-	if err != nil {
-		panic(err)
-	}
+	tablesModel := tables.InitModel(conn)
 
-	return model{
-		db:                 conn,
-		textarea:           txt,
-		err:                nil,
-		tables:             tables,
-		selectedTab:        DatabaseTab,
-		selectedTableIndex: 0,
+	return MainModel{
+		db:          conn,
+		queryInput:  "",
+		err:         nil,
+		selectedTab: DatabaseTab,
+		tablesModel: tablesModel,
 	}
 }
 
-func (m model) Init() tea.Cmd {
+func (m MainModel) Init() tea.Cmd {
 	return textarea.Blink
 }
 
-func exucuteSQL(sql string, conn *sql.DB) tea.Cmd {
-	return func() tea.Msg {
-		result, err := db.ExecuteSQL(conn, sql)
-		if err != nil {
-			return errMsg(err)
-		}
-		return executeSqlMsg{result: result}
-	}
-}
-
-type executeSqlMsg struct {
-	result db.ExecuteResult
-}
-
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
-
-	if m.selectedTab == TablesTab {
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.Type {
-			case tea.KeyDown:
-				m.selectedTableIndex++
-				if m.selectedTableIndex > len(m.tables) {
-					m.selectedTableIndex = 0
-				}
-
-			case tea.KeyUp:
-				m.selectedTableIndex--
-				if m.selectedTableIndex < 0 {
-					m.selectedTableIndex = len(m.tables) - 1
-				}
-			}
-		}
-	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.terminalWidth = msg.Width
 		m.terminalHeight = msg.Height
-	case executeSqlMsg:
-
-		columns := make([]table.Column, 0)
-
-		for _, col := range msg.result.Columns {
-			columns = append(columns, table.Column{
-				Title: col,
-				Width: 10,
-			})
-		}
-
-		rows := make([]table.Row, 0)
-
-		for _, row := range msg.result.Rows {
-			r := make([]string, 0)
-
-			for _, col := range msg.result.Columns {
-				r = append(r, fmt.Sprintf("%v", row[col]))
-			}
-
-			rows = append(rows, table.Row(r))
-		}
-
-		t := table.New(
-			table.WithColumns(columns),
-			table.WithRows(rows),
-			table.WithFocused(true),
-			table.WithHeight(10),
-		)
-
-		s := table.DefaultStyles()
-		s.Header = s.Header.
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Color("240")).
-			BorderBottom(true).
-			Bold(false)
-		s.Selected = s.Selected.
-			Foreground(lipgloss.Color("229")).
-			Background(lipgloss.Color("57")).
-			Bold(false)
-		t.SetStyles(s)
-
-		t.Focus()
-
-		m.resultTable = t
 
 	case tea.KeyMsg:
 		switch msg.Type {
-
 		case tea.KeyTab:
 			m.selectedTab++
+
 			if m.selectedTab > ResultTab {
 				m.selectedTab = DatabaseTab
 			}
 
-		case tea.KeyEnter:
-			if !m.textarea.Focused() {
-
-				cmd = exucuteSQL(m.textarea.Value(), m.db)
-				cmds = append(cmds, cmd)
-			} else {
-				m.textarea, cmd = m.textarea.Update(msg)
-			}
-
-		case tea.KeyEsc:
-			if m.textarea.Focused() {
-				m.textarea.Blur()
-			}
-
 		case tea.KeyCtrlC:
 			return m, tea.Quit
-
-		default:
-			if !m.textarea.Focused() {
-				cmd = m.textarea.Focus()
-			} else {
-				m.textarea, cmd = m.textarea.Update(msg)
-			}
 		}
-
-	case errMsg:
-		m.err = msg
-		return m, nil
 	}
 
-	cmds = append(cmds, cmd)
+	if m.selectedTab == TablesTab {
+		m.tablesModel, cmd = m.tablesModel.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
 	return m, tea.Batch(cmds...)
 }
 
-func (m model) TablesView() string {
-	tableStyles := lipgloss.NewStyle()
-
-	tables := make([]string, 0)
-
-	for idx, table := range m.tables {
-		tables = append(
-			tables,
-			tableStyles.Foreground(getBorderColor(m.selectedTableIndex == idx)).Render(table),
-		)
-	}
-
-	return lipgloss.JoinVertical(lipgloss.Left, tables...)
+func (m MainModel) QueryView() string {
+	return m.queryInput
 }
 
-func (m model) QueryView() string {
-	return m.textarea.View()
-}
-
-func (m model) ResultView() string {
-	return m.resultTable.View()
+func (m MainModel) ResultView() string {
+	return lipgloss.JoinVertical(
+		lipgloss.Top,
+		m.latestResult.table.View(),
+		fmt.Sprintf("Executed in %d microseconds", m.latestResult.microSeconds),
+	)
 }
 
 func getBorderColor(selected bool) lipgloss.TerminalColor {
@@ -226,7 +113,7 @@ func getBorderColor(selected bool) lipgloss.TerminalColor {
 	return lipgloss.Color("255")
 }
 
-func (m model) View() string {
+func (m MainModel) View() string {
 	safeWidth := m.terminalWidth - 5
 	safeHeight := m.terminalHeight - 5
 
@@ -248,14 +135,7 @@ func (m model) View() string {
 		"127.0.0.1:3306",
 	)
 
-	tablesTab := design.CreatePane(
-		2,
-		"Tables",
-		m.selectedTab == TablesTab,
-		leftColWidth,
-		tablesHeight,
-		m.TablesView(),
-	)
+	tablesTab := m.tablesModel.View(m.selectedTab == TablesTab, leftColWidth, tablesHeight)
 
 	queryTab := design.CreatePane(
 		3,

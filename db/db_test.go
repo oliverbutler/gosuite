@@ -19,6 +19,8 @@ func TestExecute(t *testing.T) {
 		t.Errorf("No rows returned")
 	}
 
+	fmt.Println(res.Microseconds)
+
 	fmt.Println(res)
 }
 

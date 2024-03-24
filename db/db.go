@@ -3,7 +3,9 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-sql-driver/mysql"
 )
 
@@ -28,16 +30,33 @@ func Connect() *sql.DB {
 	return db
 }
 
+type errMsg error
+
+func ExucuteSQLCmd(sql string, conn *sql.DB) tea.Cmd {
+	return func() tea.Msg {
+		result, err := ExecuteSQL(conn, sql)
+		if err != nil {
+			return errMsg(err)
+		}
+		return result
+	}
+}
+
 type ExecuteResult struct {
-	Rows    []map[string]interface{}
-	Columns []string
+	Rows         []map[string]interface{}
+	Columns      []string
+	Microseconds int64
 }
 
 func ExecuteSQL(db *sql.DB, sql string) (ExecuteResult, error) {
+	start := time.Now()
+
 	rows, err := db.Query(sql)
 	if err != nil {
 		return ExecuteResult{}, err
 	}
+
+	elapsed := time.Since(start)
 
 	defer rows.Close()
 
@@ -83,7 +102,7 @@ func ExecuteSQL(db *sql.DB, sql string) (ExecuteResult, error) {
 		return ExecuteResult{}, err
 	}
 
-	return ExecuteResult{Rows: results, Columns: columns}, nil
+	return ExecuteResult{Rows: results, Columns: columns, Microseconds: elapsed.Microseconds()}, nil
 }
 
 func GetTableSchema(db *sql.DB, table string) (ExecuteResult, error) {
