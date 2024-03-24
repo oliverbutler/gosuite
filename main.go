@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/table"
 	textarea "github.com/charmbracelet/bubbles/textarea"
@@ -168,6 +169,51 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func addTextToBorder(content string, index string, text string, selected bool) string {
+	lines := strings.Split(content, "\n")
+
+	insertionText := lipgloss.NewStyle().Bold(selected).Render("[" + index + "] " + text)
+
+	insertAt := 3
+
+	runes := []rune(lines[0])
+
+	beforeInsertion := string(runes[:insertAt])
+
+	// TODO: Not sure why 8 is the magic number here
+	cutIndex := insertAt + len([]rune(insertionText)) - 8
+
+	if cutIndex > len(runes) {
+		cutIndex = len(runes)
+	}
+
+	afterInsertion := string(runes[cutIndex:])
+
+	lines[0] = beforeInsertion + insertionText + afterInsertion
+
+	return strings.Join(lines, "\n")
+}
+
+func (m model) TablesView() string {
+	tableStyles := lipgloss.NewStyle()
+
+	tables := make([]string, 0)
+
+	for _, table := range m.tables {
+		tables = append(tables, tableStyles.Render(table))
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, tables...)
+}
+
+func (m model) QueryView() string {
+	return m.textarea.View()
+}
+
+func (m model) ResultView() string {
+	return m.resultTable.View()
+}
+
 func (m model) View() string {
 	// Tab is a bordered box, with a name near the top left with a number e.g. 1. Database or 2. Tables
 	tabStyles := lipgloss.NewStyle().
@@ -187,10 +233,30 @@ func (m model) View() string {
 	queryHeight := 10
 	resultHeight := safeHeight - queryHeight
 
-	databaseTab := tabStyles.Width(leftColWidth).Height(databaseHeight).Render("1. Database")
-	tablesTab := tabStyles.Width(leftColWidth).Height(tablesHeight).Render("2. Tables")
-	queryTab := tabStyles.Width(rightColWidth).Height(queryHeight).Render("3. Query")
-	resultTab := tabStyles.Width(rightColWidth).Height(resultHeight).Render("4. Result")
+	databaseTab := addTextToBorder(
+		tabStyles.Width(leftColWidth).Height(databaseHeight).Render("127.0.0.1:3306 (LOCAL)"),
+		"1",
+		"Database",
+		m.selectedTab == DatabaseTab,
+	)
+	tablesTab := addTextToBorder(
+		tabStyles.Width(leftColWidth).Height(tablesHeight).Render(m.TablesView()),
+		"2",
+		"Tables",
+		m.selectedTab == TablesTab,
+	)
+	queryTab := addTextToBorder(
+		tabStyles.Width(rightColWidth).Height(queryHeight).Render(m.QueryView()),
+		"3",
+		"Query",
+		m.selectedTab == QueryTab,
+	)
+	resultTab := addTextToBorder(
+		tabStyles.Width(rightColWidth).Height(resultHeight).Render(m.ResultView()),
+		"4",
+		"Result",
+		m.selectedTab == ResultTab,
+	)
 
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, databaseTab, tablesTab)
 	rightCol := lipgloss.JoinVertical(lipgloss.Left, queryTab, resultTab)

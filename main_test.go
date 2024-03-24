@@ -2,22 +2,23 @@ package main
 
 import (
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
-func sum(a, b int) int {
-	return a + b
+func TestView(t *testing.T) {
+	m := initialModel()
+
+	res := m.View()
+
+	println(res)
 }
 
-func TestSum(t *testing.T) {
-	res := sum(1, 2)
+func TestBorderStyling(t *testing.T) {
+	res := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("24")).
+		Render("Hello, World!")
 
-	res2 := sum(2, 3)
-
-	if res2 != 5 {
-		t.Error("Expected 2 + 3 to equal 5")
-	}
-
-	if res != 3 {
-		t.Error("Expected 1 + 2 to equal 3")
-	}
+	println(res)
 }
