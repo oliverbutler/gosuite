@@ -136,6 +136,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 
+		case tea.KeyTab:
+			m.selectedTab++
+			if m.selectedTab > ResultTab {
+				m.selectedTab = DatabaseTab
+			}
+
 		case tea.KeyEnter:
 			if !m.textarea.Focused() {
 
@@ -176,7 +182,6 @@ func stripANSI(str string) string {
 	return re.ReplaceAllString(str, "")
 }
 
-// 'selected' determines whether the text is bolded.
 func addTextToBorder(content, index, text string, selected bool) string {
 	lines := strings.Split(content, "\n")
 	if len(lines) < 1 {
@@ -191,23 +196,31 @@ func addTextToBorder(content, index, text string, selected bool) string {
 	// Calculate the visible length of the insertionText by stripping ANSI codes.
 	visibleInsertionLength := len(stripANSI(insertionText))
 
-	// Calculate insertion points based on the actual visible content length.
-	insertAt := 3 // Assumes a fixed starting position for the insertion.
+	magicNumber := 6
 
-	// Convert the first line to runes to handle potential Unicode characters correctly.
+	// Process the first line to find the third visible character position.
+	strippedFirstLine := stripANSI(lines[0])
+	// Ensuring not to exceed the length of the stripped line.
+	if len(strippedFirstLine) < magicNumber {
+		return content // Not enough length for insertion.
+	}
+
+	// The third visible character position in the stripped content.
+	// Adjust 'insertAt' dynamically based on your requirements.
+	insertAt := magicNumber + len([]rune(strippedFirstLine)[:magicNumber])
+
+	// Convert the original first line (with ANSI codes) to runes.
 	runes := []rune(lines[0])
-
-	// Calculate the cut index based on visible content, adjusting for the border's visual length.
+	// Calculate the cut index; adjust dynamically if necessary.
 	cutIndex := insertAt + visibleInsertionLength
 	if cutIndex > len(runes) {
 		cutIndex = len(runes) // Ensure cutIndex does not exceed the line length.
 	}
 
-	// Reassemble the modified top border.
 	beforeInsertion := string(runes[:insertAt])
 	afterInsertion := string(runes[cutIndex:])
 
-	// Construct the new first line with the inserted text.
+	// Reassemble the modified top border.
 	lines[0] = beforeInsertion + insertionText + afterInsertion
 
 	return strings.Join(lines, "\n")
