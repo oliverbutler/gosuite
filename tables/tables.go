@@ -38,17 +38,21 @@ func (m Model) Update(msg tea.Msg, active bool, conn *sql.DB) (Model, tea.Cmd) {
 	if active {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
-			switch msg.Type {
-			case tea.KeyUp:
+			switch msg.String() {
+			case "up":
 				if m.SelectedTableIndex > 0 && active {
 					m.SelectedTableIndex--
 				}
-			case tea.KeyDown:
+			case "down":
 				if m.SelectedTableIndex < len(m.Tables)-1 && active {
 					m.SelectedTableIndex++
 				}
-			case tea.KeyEnter:
+			case "enter":
 				cmd = db.ExucuteSQLCmd("SELECT * FROM "+m.Tables[m.SelectedTableIndex], conn)
+				cmds = append(cmds, cmd)
+
+			case "i":
+				cmd = db.ExucuteSQLCmd("DESCRIBE "+m.Tables[m.SelectedTableIndex], conn)
 				cmds = append(cmds, cmd)
 			}
 		}

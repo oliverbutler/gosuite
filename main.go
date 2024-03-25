@@ -163,7 +163,7 @@ func (m MainModel) View() string {
 	safeWidth := m.terminalWidth - 5
 	safeHeight := m.terminalHeight - 6
 
-	leftColWidth := 40
+	leftColWidth := 25
 	rightColWidth := safeWidth - leftColWidth
 
 	databaseHeight := 5
@@ -182,7 +182,6 @@ func (m MainModel) View() string {
 			lipgloss.NewStyle().Render("127.0.0.1:3306  "), lipgloss.NewStyle().
 				Background(lipgloss.Color("120")).
 				Foreground(lipgloss.Color("0")).
-				Padding(0, 2).
 				Render("Connected")),
 	)
 
