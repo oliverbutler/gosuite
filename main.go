@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	textarea "github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -27,13 +29,51 @@ const (
 type MainModel struct {
 	db             *sql.DB
 	err            error
-	queryInput     string
 	terminalWidth  int
 	terminalHeight int
 	selectedTab    int
 	tablesModel    tables.Model
 	resultModel    result.Model
 	queryModel     query.Model
+
+	// Keys
+	keys keyMap
+	help help.Model
+}
+
+type keyMap map[string]key.Binding
+
+var QuitKey = key.NewBinding(
+	key.WithKeys("q", "ctrl+c"),
+	key.WithHelp("q", "Quit"),
+)
+
+var TabKey = key.NewBinding(
+	key.WithKeys("tab"),
+	key.WithHelp("tab", "Next tab"),
+)
+
+var ShiftTabKey = key.NewBinding(
+	key.WithKeys("shift+tab"),
+	key.WithHelp("shift+tab", "Previous tab"),
+)
+
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		QuitKey,
+		TabKey,
+		ShiftTabKey,
+	}
+}
+
+func (k keyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{
+			QuitKey,
+			TabKey,
+			ShiftTabKey,
+		},
+	}
 }
 
 type errMsg error
@@ -47,12 +87,17 @@ func initialModel() MainModel {
 
 	return MainModel{
 		db:          conn,
-		queryInput:  "",
 		err:         nil,
 		selectedTab: DatabaseTab,
 		tablesModel: tablesModel,
 		resultModel: resultModel,
 		queryModel:  queryModel,
+		keys: keyMap{
+			"Quit":     QuitKey,
+			"Tab":      TabKey,
+			"ShiftTab": ShiftTabKey,
+		},
+		help: help.NewModel(),
 	}
 }
 
@@ -114,13 +159,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m MainModel) QueryView() string {
-	return m.queryInput
-}
-
 func (m MainModel) View() string {
 	safeWidth := m.terminalWidth - 5
-	safeHeight := m.terminalHeight - 5
+	safeHeight := m.terminalHeight - 6
 
 	leftColWidth := 40
 	rightColWidth := safeWidth - leftColWidth
@@ -152,7 +193,11 @@ func (m MainModel) View() string {
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, databaseTab, tablesTab)
 	rightCol := lipgloss.JoinVertical(lipgloss.Left, queryTab, resultTab)
 
-	layout := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol)
+	layout := lipgloss.JoinVertical(
+		lipgloss.Top,
+		lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol),
+		m.help.View(m.keys),
+	)
 
 	return layout
 }
