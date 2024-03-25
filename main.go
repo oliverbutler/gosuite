@@ -58,11 +58,17 @@ var ShiftTabKey = key.NewBinding(
 	key.WithHelp("shift+tab", "Previous tab"),
 )
 
+var FocusQueryKey = key.NewBinding(
+	key.WithKeys("/"),
+	key.WithHelp("/", "Focus on query"),
+)
+
 func (k keyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		QuitKey,
 		TabKey,
 		ShiftTabKey,
+		FocusQueryKey,
 	}
 }
 
@@ -72,6 +78,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 			QuitKey,
 			TabKey,
 			ShiftTabKey,
+			FocusQueryKey,
 		},
 	}
 }
@@ -93,9 +100,10 @@ func initialModel() MainModel {
 		resultModel: resultModel,
 		queryModel:  queryModel,
 		keys: keyMap{
-			"Quit":     QuitKey,
-			"Tab":      TabKey,
-			"ShiftTab": ShiftTabKey,
+			"Quit":       QuitKey,
+			"Tab":        TabKey,
+			"ShiftTab":   ShiftTabKey,
+			"FocusQuery": FocusQueryKey,
 		},
 		help: help.NewModel(),
 	}
@@ -113,6 +121,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.terminalWidth = msg.Width
 		m.terminalHeight = msg.Height
+
+	case query.FocusOnQueryMsg:
+		m.selectedTab = QueryTab
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -132,13 +143,25 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "1":
-			m.selectedTab = DatabaseTab
+			if !m.queryModel.Input.Focused() {
+				m.selectedTab = DatabaseTab
+			}
 		case "2":
-			m.selectedTab = TablesTab
+			if !m.queryModel.Input.Focused() {
+				m.selectedTab = TablesTab
+			}
 		case "3":
-			m.selectedTab = QueryTab
+			if !m.queryModel.Input.Focused() {
+				m.selectedTab = QueryTab
+			}
 		case "4":
-			m.selectedTab = ResultTab
+			if !m.queryModel.Input.Focused() {
+				m.selectedTab = ResultTab
+			}
+
+		case "/":
+			cmd = query.FocusOnQuery()
+			cmds = append(cmds, cmd)
 
 		case "ctrl+c":
 			return m, tea.Quit
