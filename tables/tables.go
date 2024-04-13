@@ -48,7 +48,7 @@ func (m Model) Update(msg tea.Msg, active bool, conn *sql.DB) (Model, tea.Cmd) {
 					m.SelectedTableIndex++
 				}
 			case "enter":
-				cmd = db.ExucuteSQLCmd("SELECT * FROM "+m.Tables[m.SelectedTableIndex], conn)
+				cmd = db.ExucuteSQLCmd("SELECT * FROM "+m.Tables[m.SelectedTableIndex]+" LIMIT 10", conn)
 				cmds = append(cmds, cmd)
 
 			case "i":
@@ -67,11 +67,13 @@ func (m Model) View(selected bool, width int, height int) string {
 	tables := make([]string, 0)
 
 	for idx, table := range m.Tables {
-		tables = append(
-			tables,
-			tableStyles.Foreground(design.GetBorderColor(m.SelectedTableIndex == idx && selected)).
-				Render(table),
-		)
+		if idx < 10 {
+			tables = append(
+				tables,
+				tableStyles.Foreground(design.GetBorderColor(m.SelectedTableIndex == idx && selected)).
+					Render(table),
+			)
+		}
 	}
 
 	content := lipgloss.JoinVertical(lipgloss.Left, tables...)

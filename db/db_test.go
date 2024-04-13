@@ -10,6 +10,7 @@ func TestExecute(t *testing.T) {
 	db := Connect()
 	defer db.Close()
 
+	// Banana
 	res, err := ExecuteSQL(db, "SELECT * FROM posts")
 	if err != nil {
 		panic(err)

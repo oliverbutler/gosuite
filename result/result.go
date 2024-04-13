@@ -74,7 +74,7 @@ func truncateString(s string, length int) string {
 	return s
 }
 
-func renderColumns(result *db.ExecuteResult) string {
+func renderColumns(result *db.ExecuteResult, width int) string {
 	content := make([]string, 0)
 
 	for _, column := range result.Columns {
@@ -86,10 +86,12 @@ func renderColumns(result *db.ExecuteResult) string {
 				Render(fmt.Sprintf("%v", column)))
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Left, content...)
+	joined := lipgloss.JoinHorizontal(lipgloss.Left, content...)
+
+	return lipgloss.NewStyle().MaxWidth(width).Render(joined)
 }
 
-func renderRow(columns []string, data map[string]interface{}, cursorColumnIndex int) string {
+func renderRow(columns []string, data map[string]interface{}, cursorColumnIndex int, width int) string {
 	var content string
 
 	for idx, column := range columns {
@@ -112,10 +114,10 @@ func renderRow(columns []string, data map[string]interface{}, cursorColumnIndex 
 		}
 	}
 
-	return content
+	return lipgloss.NewStyle().MaxWidth(width).Render(content)
 }
 
-func renderRows(result *db.ExecuteResult, cursor Cursor) string {
+func renderRows(result *db.ExecuteResult, cursor Cursor, width int) string {
 	var content string
 
 	for idx, row := range result.Rows {
@@ -128,7 +130,7 @@ func renderRows(result *db.ExecuteResult, cursor Cursor) string {
 			columnIndex = cursor.Column
 		}
 
-		content += renderRow(result.Columns, row, columnIndex) + "\n"
+		content += renderRow(result.Columns, row, columnIndex, width) + "\n"
 	}
 
 	return content
@@ -140,8 +142,8 @@ func (m Model) View(selected bool, width int, height int) string {
 	if m.result != nil {
 		content = lipgloss.JoinVertical(
 			lipgloss.Top,
-			renderColumns(m.result),
-			renderRows(m.result, m.cursor),
+			renderColumns(m.result, width-2),
+			renderRows(m.result, m.cursor, width-2),
 			fmt.Sprintf("Executed in %d microseconds", m.result.Microseconds),
 		)
 	}

@@ -95,7 +95,7 @@ func initialModel() MainModel {
 	return MainModel{
 		db:          conn,
 		err:         nil,
-		selectedTab: DatabaseTab,
+		selectedTab: TablesTab,
 		tablesModel: tablesModel,
 		resultModel: resultModel,
 		queryModel:  queryModel,

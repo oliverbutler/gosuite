@@ -11,10 +11,10 @@ import (
 
 func Connect() *sql.DB {
 	config := mysql.Config{
-		User:   "user",
-		Passwd: "password",
+		User:   "root",
+		Passwd: "rootpassword",
 		Addr:   "127.0.0.1:3306",
-		DBName: "test",
+		DBName: "onsi-services",
 	}
 
 	db, err := sql.Open("mysql", config.FormatDSN())
