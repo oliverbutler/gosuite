@@ -15,6 +15,7 @@ import (
 	design "gosuite/design"
 	query "gosuite/query"
 	result "gosuite/result"
+	"gosuite/services/config"
 	tables "gosuite/tables"
 )
 
@@ -225,6 +226,18 @@ func (m MainModel) View() string {
 }
 
 func main() {
+	config, err := config.GetConfig()
+
+	if err != nil {
+		fmt.Printf("Error: %v", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf(
+		"Config: %v\n",
+		config,
+	)
+
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 	if err := p.Start(); err != nil {
 		fmt.Printf("Error: %v", err)
