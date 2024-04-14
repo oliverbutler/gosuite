@@ -67,16 +67,14 @@ func (m Model) View(selected bool, width int, height int) string {
 	tables := make([]string, 0)
 
 	for idx, table := range m.Tables {
-		if idx < 10 {
-			tables = append(
-				tables,
-				tableStyles.Foreground(design.GetBorderColor(m.SelectedTableIndex == idx && selected)).
-					Render(table),
-			)
-		}
+		tables = append(
+			tables,
+			tableStyles.Foreground(design.GetBorderColor(m.SelectedTableIndex == idx && selected)).
+				Render(table),
+		)
 	}
 
-	content := lipgloss.JoinVertical(lipgloss.Left, tables...)
+	content := lipgloss.NewStyle().MaxHeight(height - 15).Render(lipgloss.JoinVertical(lipgloss.Left, tables...))
 
 	return design.CreatePane(2, "Tables", selected, width, height, content)
 }
