@@ -7,14 +7,71 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-sql-driver/mysql"
+	config "gosuite/services/config"
 )
 
-func Connect() *sql.DB {
+type Connection interface {
+	Status() string
+	GetConfig() *config.DatabaseConfig
+	GetConnection() *sql.DB
+}
+
+type ConnectionSuccess struct {
+	config *config.DatabaseConfig
+	db     *sql.DB
+}
+
+func (cs ConnectionSuccess) Status() string {
+	return "Connected"
+}
+
+func (cs ConnectionSuccess) GetConfig() *config.DatabaseConfig {
+	return cs.config
+}
+
+func (cs ConnectionSuccess) GetConnection() *sql.DB {
+	return cs.db
+}
+
+type ConnectionError struct {
+	config *config.DatabaseConfig
+	reason string
+}
+
+func (ce ConnectionError) Status() string {
+	return ce.reason
+}
+
+func (ce ConnectionError) GetConfig() *config.DatabaseConfig {
+	return ce.config
+}
+
+func (ce ConnectionError) GetConnection() *sql.DB {
+	return nil
+}
+
+type ConnectionPending struct {
+	Config *config.DatabaseConfig
+}
+
+func (cp ConnectionPending) Status() string {
+	return "Connecting..."
+}
+
+func (cp ConnectionPending) GetConfig() *config.DatabaseConfig {
+	return cp.Config
+}
+
+func (cp ConnectionPending) GetConnection() *sql.DB {
+	return nil
+}
+
+func Connect(info *config.DatabaseConfig) *sql.DB {
 	config := mysql.Config{
-		User:                    "root",
-		Passwd:                  "password",
-		Addr:                    "127.0.0.1:3306",
-		DBName:                  "services",
+		User:                    info.User,
+		Passwd:                  info.Password,
+		Addr:                    fmt.Sprintf("%s:%d", info.Host, info.Port),
+		DBName:                  info.Database,
 		AllowNativePasswords:    true,
 		AllowCleartextPasswords: true,
 	}

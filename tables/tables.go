@@ -1,8 +1,6 @@
 package tables
 
 import (
-	"database/sql"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -15,14 +13,9 @@ type Model struct {
 	SelectedTableIndex int
 }
 
-func InitModel(conn *sql.DB) Model {
-	tables, err := db.GetTables(conn)
-	if err != nil {
-		panic(err)
-	}
-
+func InitModel() Model {
 	return Model{
-		Tables:             tables,
+		Tables:             []string{},
 		SelectedTableIndex: 0,
 	}
 }
@@ -31,9 +24,9 @@ func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m Model) Update(msg tea.Msg, active bool, conn *sql.DB) (Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg, active bool, conn *db.Connection) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	var cmd tea.Cmd
+	// var cmd tea.Cmd
 
 	if active {
 		switch msg := msg.(type) {
@@ -47,13 +40,14 @@ func (m Model) Update(msg tea.Msg, active bool, conn *sql.DB) (Model, tea.Cmd) {
 				if m.SelectedTableIndex < len(m.Tables)-1 && active {
 					m.SelectedTableIndex++
 				}
-			case "enter":
-				cmd = db.ExucuteSQLCmd("SELECT * FROM "+m.Tables[m.SelectedTableIndex]+" LIMIT 10", conn)
-				cmds = append(cmds, cmd)
-
-			case "i":
-				cmd = db.ExucuteSQLCmd("DESCRIBE "+m.Tables[m.SelectedTableIndex], conn)
-				cmds = append(cmds, cmd)
+				// TODO: Resurrect this
+				// case "enter":
+				// 	cmd = db.ExucuteSQLCmd("SELECT * FROM "+m.Tables[m.SelectedTableIndex]+" LIMIT 10", conn)
+				// 	cmds = append(cmds, cmd)
+				//
+				// case "i":
+				// 	cmd = db.ExucuteSQLCmd("DESCRIBE "+m.Tables[m.SelectedTableIndex], conn)
+				// 	cmds = append(cmds, cmd)
 			}
 		}
 	}

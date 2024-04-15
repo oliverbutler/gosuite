@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 
@@ -12,14 +11,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	db "gosuite/db"
-	design "gosuite/design"
 	query "gosuite/query"
 	result "gosuite/result"
 	"gosuite/services/config"
 	tables "gosuite/tables"
+	database "gosuite/views/database"
 )
 
-// Enum for the selected tab
 const (
 	DatabaseTab = iota
 	TablesTab
@@ -28,14 +26,19 @@ const (
 )
 
 type MainModel struct {
-	db             *sql.DB
+	config *config.AppConfig
+
+	connection db.Connection
+
 	err            error
 	terminalWidth  int
 	terminalHeight int
 	selectedTab    int
-	tablesModel    tables.Model
-	resultModel    result.Model
-	queryModel     query.Model
+
+	databaseModel database.Model
+	tablesModel   tables.Model
+	resultModel   result.Model
+	queryModel    query.Model
 
 	// Keys
 	keys keyMap
@@ -85,30 +88,6 @@ func (k keyMap) FullHelp() [][]key.Binding {
 }
 
 type errMsg error
-
-func initialModel() MainModel {
-	conn := db.Connect()
-
-	tablesModel := tables.InitModel(conn)
-	resultModel := result.InitModel()
-	queryModel := query.InitModel()
-
-	return MainModel{
-		db:          conn,
-		err:         nil,
-		selectedTab: TablesTab,
-		tablesModel: tablesModel,
-		resultModel: resultModel,
-		queryModel:  queryModel,
-		keys: keyMap{
-			"Quit":       QuitKey,
-			"Tab":        TabKey,
-			"ShiftTab":   ShiftTabKey,
-			"FocusQuery": FocusQueryKey,
-		},
-		help: help.NewModel(),
-	}
-}
 
 func (m MainModel) Init() tea.Cmd {
 	return textarea.Blink
@@ -171,13 +150,16 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	m.tablesModel, cmd = m.tablesModel.Update(msg, m.selectedTab == TablesTab, m.db)
+	m.databaseModel, cmd = m.databaseModel.Update(msg, m.selectedTab == DatabaseTab)
+	cmds = append(cmds, cmd)
+
+	m.tablesModel, cmd = m.tablesModel.Update(msg, m.selectedTab == TablesTab, &m.connection)
 	cmds = append(cmds, cmd)
 
 	m.resultModel, cmd = m.resultModel.Update(msg, m.selectedTab == ResultTab)
 	cmds = append(cmds, cmd)
 
-	m.queryModel, cmd = m.queryModel.Update(msg, m.selectedTab == QueryTab, m.db)
+	m.queryModel, cmd = m.queryModel.Update(msg, m.selectedTab == QueryTab, &m.connection)
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
@@ -196,19 +178,7 @@ func (m MainModel) View() string {
 	queryHeight := 10
 	resultHeight := safeHeight - queryHeight
 
-	databaseTab := design.CreatePane(
-		1,
-		"Database",
-		m.selectedTab == DatabaseTab,
-		leftColWidth,
-		databaseHeight,
-		lipgloss.JoinHorizontal(lipgloss.Left,
-			lipgloss.NewStyle().Render("127.0.0.1:3306  "), lipgloss.NewStyle().
-				Background(lipgloss.Color("120")).
-				Foreground(lipgloss.Color("0")).
-				Render("Connected")),
-	)
-
+	databaseTab := m.databaseModel.View(m.selectedTab == DatabaseTab, leftColWidth, databaseHeight)
 	tablesTab := m.tablesModel.View(m.selectedTab == TablesTab, leftColWidth, tablesHeight)
 	queryTab := m.queryModel.View(m.selectedTab == QueryTab, rightColWidth, queryHeight)
 	resultTab := m.resultModel.View(m.selectedTab == ResultTab, rightColWidth, resultHeight)
@@ -233,12 +203,42 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf(
-		"Config: %v\n",
-		config,
-	)
+	databasesLength := len(config.Databases)
 
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	if databasesLength == 0 {
+		fmt.Printf("No databases found in config file, please add at least one database.")
+		os.Exit(1)
+	}
+
+	firstConfig := config.Databases[0]
+
+	conn := db.ConnectionPending{
+		Config: &firstConfig,
+	}
+
+	databaseModel := database.InitModel()
+	tablesModel := tables.InitModel()
+	resultModel := result.InitModel()
+	queryModel := query.InitModel()
+
+	model := MainModel{
+		connection:    conn,
+		err:           nil,
+		selectedTab:   TablesTab,
+		databaseModel: databaseModel,
+		tablesModel:   tablesModel,
+		resultModel:   resultModel,
+		queryModel:    queryModel,
+		keys: keyMap{
+			"Quit":       QuitKey,
+			"Tab":        TabKey,
+			"ShiftTab":   ShiftTabKey,
+			"FocusQuery": FocusQueryKey,
+		},
+		help: help.NewModel(),
+	}
+
+	p := tea.NewProgram(model, tea.WithAltScreen())
 	if err := p.Start(); err != nil {
 		fmt.Printf("Error: %v", err)
 		os.Exit(1)

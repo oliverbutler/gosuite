@@ -1,7 +1,6 @@
 package query
 
 import (
-	"database/sql"
 	"regexp"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -87,7 +86,7 @@ func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m Model) Update(msg tea.Msg, active bool, conn *sql.DB) (Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg, active bool, conn *db.Connection) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 
@@ -100,8 +99,9 @@ func (m Model) Update(msg tea.Msg, active bool, conn *sql.DB) (Model, tea.Cmd) {
 		switch msg.String() {
 		case "enter":
 			if active && !m.Input.Focused() {
-				cmd = db.ExucuteSQLCmd(m.Input.Value(), conn)
-				cmds = append(cmds, cmd)
+				// TODO: Resurrect this
+				// cmd = db.ExucuteSQLCmd(m.Input.Value(), conn)
+				// cmds = append(cmds, cmd)
 			}
 		case "esc":
 			if m.Input.Focused() {
@@ -111,6 +111,7 @@ func (m Model) Update(msg tea.Msg, active bool, conn *sql.DB) (Model, tea.Cmd) {
 		default:
 			if active {
 				m.Input, cmd = m.Input.Update(msg)
+				cmds = append(cmds, cmd)
 			}
 
 		}
